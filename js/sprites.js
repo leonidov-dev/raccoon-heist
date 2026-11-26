@@ -15,10 +15,11 @@ RH.Sprites = (function () {
     .concat([].concat(...C.districts.map((d) => d.targets.map((t) => 'h_' + t[0]))));
   const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
   const imgs = {};
+  const V = window.RH_BUILD ? '?v=' + window.RH_BUILD : ''; // cache-busting in builds
 
   LIST.forEach((name) => {
     const im = new Image();
-    im.src = 'assets/sprites/' + name + '.svg';
+    im.src = 'assets/sprites/' + name + '.svg' + V;
     imgs[name] = im;
   });
 
@@ -45,12 +46,12 @@ RH.Sprites = (function () {
 
   // HTML for panels/toasts: <img> if we have the sprite, emoji otherwise.
   function html(name, fallback) {
-    return imgs[name] ? `<img class="spr" src="assets/sprites/${name}.svg" alt="">` : fallback;
+    return imgs[name] ? `<img class="spr" src="assets/sprites/${name}.svg${V}" alt="">` : fallback;
   }
 
   // Raccoon with a hat on top, for panel icons.
   function raccoonHtml(hat) {
-    return `<span class="rac"><img src="assets/sprites/raccoon.svg" alt="">${hat ? `<img class="rac-hat" src="assets/sprites/${hat}.svg" alt="">` : ''}</span>`;
+    return `<span class="rac"><img src="assets/sprites/raccoon.svg${V}" alt="">${hat ? `<img class="rac-hat" src="assets/sprites/${hat}.svg${V}" alt="">` : ''}</span>`;
   }
 
   return { img, draw, html, raccoonHtml, has: (name) => !!imgs[name] };
