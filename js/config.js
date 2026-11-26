@@ -60,7 +60,7 @@ RH.CONFIG = {
     serveBoss: 0.3,            // seconds per buyer when the Boss stands at the register
     serveCashier: 1.2,         // seconds per buyer for a cashier (level 1; faster per level)
     buyers: ['npc_cat', 'npc_bird', 'npc_bunny'],
-    buyerEmoji: ['🐱', '🐦', '🐰'],
+    buyerEmoji: ['🐱', '🐦', '🐀'],
   },
 
   // Buy zones ("$ 500" style): stand on it, coins drain into it.

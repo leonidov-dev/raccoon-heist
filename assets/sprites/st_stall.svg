@@ -1,10 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 110"><g stroke="#2a2230" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
-<path d="M14 40 L14 100 M126 40 L126 100" stroke-width="7"/>
-<path d="M4 40 L16 8 L124 8 L136 40Z" fill="#ff6fb5"/>
-<g stroke="none"><path d="M16 8 L30 8 L24 40 L4 40Z" fill="#fff"/><path d="M50 8 L64 8 L62 40 L46 40Z" fill="#fff"/><path d="M84 8 L98 8 L100 40 L84 40Z" fill="#fff"/><path d="M114 8 L124 8 L136 40 L122 40Z" fill="#fff"/></g>
-<path d="M4 40 L16 8 L124 8 L136 40Z" fill="none"/>
-<path d="M4 40 Q15 50 26 40 Q37 50 48 40 Q59 50 70 40 Q81 50 92 40 Q103 50 114 40 Q125 50 136 40" fill="#ff6fb5" stroke-width="4"/>
-<rect x="6" y="66" width="128" height="38" rx="6" fill="#c99a62"/>
-<path d="M6 78 L134 78" stroke="#a87a42" stroke-width="4"/>
-<rect x="2" y="60" width="136" height="10" rx="4" fill="#e8c094"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 110"><defs><clipPath id="tarp"><path d="M2 40 L16 10 L124 10 L138 40Z"/></clipPath></defs><g stroke="#2a2230" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
+<path d="M14 36 L14 100 M126 36 L126 100" stroke-width="7"/>
+<path d="M2 40 L16 10 L124 10 L138 40Z" fill="#2f2b3a"/>
+<g clip-path="url(#tarp)" stroke="none" fill="#5b3f8f"><path d="M20 10 L36 10 L30 40 L10 40Z"/><path d="M56 10 L72 10 L70 40 L52 40Z"/><path d="M92 10 L108 10 L112 40 L92 40Z"/></g>
+<path d="M2 40 L16 10 L124 10 L138 40Z" fill="none"/>
+<path d="M2 40 Q11 49 20 40 Q29 49 38 40 Q47 49 56 40 Q65 49 74 40 Q83 49 92 40 Q101 49 110 40 Q119 49 128 40 Q133 46 138 40" fill="#2f2b3a" stroke-width="4"/>
+<circle cx="70" cy="34" r="13" fill="#ffe37a" stroke="none" opacity=".35"/>
+<path d="M70 12 L70 26" stroke-width="3"/>
+<circle cx="70" cy="31" r="6" fill="#ffe37a" stroke-width="3"/>
+<rect x="104" y="44" width="30" height="18" rx="2" fill="#d6b07a" stroke-width="3" transform="rotate(-10 119 53)"/>
+<text x="119" y="58" font-size="14" font-weight="900" text-anchor="middle" fill="#2a2230" stroke="none" font-family="Arial" transform="rotate(-10 119 53)">$$</text>
+<rect x="6" y="64" width="62" height="40" rx="3" fill="#9a6a3c"/>
+<rect x="72" y="64" width="62" height="40" rx="3" fill="#8a5a32"/>
+<path d="M10 68 L64 100 M64 68 L10 100 M76 68 L130 100 M130 68 L76 100" stroke="#6f4426" stroke-width="4"/>
+<rect x="6" y="64" width="62" height="40" rx="3" fill="none"/><rect x="72" y="64" width="62" height="40" rx="3" fill="none"/>
+<path d="M2 58 L138 58 L132 70 Q100 76 70 70 Q40 76 8 70Z" fill="#3a2a63" stroke-width="4"/>
 </g></svg>
