@@ -174,3 +174,22 @@ button { font-family: inherit; cursor: pointer; border: none; color: inherit; }
 .mock-ad-timer { font-size: 64px; font-weight: 900; color: #ffd84d; margin-top: 10px; }
 
 #loading { position: fixed; inset: 0; background: #2a1b47; display: flex; align-items: center; justify-content: center; font-size: 80px; z-index: 50; }
+
+/* ---------- Crew room & districts ---------- */
+.crew-card { background: rgba(255,255,255,.05); border-radius: 14px; padding: 4px 4px 8px; display: flex; flex-direction: column; gap: 4px; }
+.crew-card > .row { background: transparent; }
+.skill { display: flex; align-items: center; gap: 10px; margin-left: 56px; padding: 6px 10px; background: rgba(0,0,0,.2); border-radius: 12px; }
+.skill .row-title { font-size: 14px; }
+.drow { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 4px; font-weight: 800; }
+.drow.here { color: #7dffb2; }
+.drow.locked { opacity: .85; }
+.chip.go { background: #3fd8d0; color: #1b1035; }
+
+/* ---------- Tutorial ---------- */
+.tut-num { background: #2a1b47; color: #ffe35c; border-radius: 999px; padding: 2px 9px; margin-right: 10px; font-size: 15px; }
+#tut-finger { position: fixed; z-index: 30; font-size: 46px; pointer-events: none; transform: translate(-50%, 0);
+  filter: drop-shadow(0 3px 0 rgba(0,0,0,.4)); animation: tap .9s ease-in-out infinite; display: none; }
+@keyframes tap { 50% { transform: translate(-50%, -12px); } }
+.tut-pulse { animation: tutpulse .9s ease-in-out infinite !important; position: relative; z-index: 1; }
+@keyframes tutpulse { 50% { box-shadow: 0 0 0 6px rgba(255,227,92,.7), 0 0 22px rgba(255,227,92,.9); transform: scale(1.06); } }
+.tut-goals { display: flex; flex-direction: column; gap: 6px; text-align: left; background: rgba(0,0,0,.2); border-radius: 12px; padding: 10px 14px; font-weight: 800; }

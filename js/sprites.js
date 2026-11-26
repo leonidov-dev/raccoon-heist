@@ -4,7 +4,9 @@ window.RH = window.RH || {};
 RH.Sprites = (function () {
   const C = RH.CONFIG;
   const LIST = ['raccoon', 'cop', 'bag', 'coin', 'chest', 'chest_big', 'boost', 'album', 'siren', 'police_car',
-    'zone_washer2', 'zone_cooler', 'up_paws', 'up_nose', 'up_backpack', 'up_speed', 'up_loader']
+    'zone_washer2', 'zone_cooler', 'up_paws', 'up_nose', 'up_backpack', 'up_speed', 'up_loader', 'st_stall']
+    .concat(C.shop.buyers)
+    .concat([].concat(...C.districts.map((d) => d.decor)))
     .concat(C.treasures.map((t) => 't_' + t.id))
     .concat(C.cosmetics.hats.map((h) => 'hat_' + h.id))
     .concat(C.cosmetics.vans.map((v) => 'van_' + v.id))

@@ -11,11 +11,10 @@ RH.UI = (function () {
   let suppressed = null;     // station whose panel the player closed while standing in it
   let sig = '';
   let modal = null;
-  let wsTab = 'gear';        // workshop tab: 'gear' | 'crew'
   let mini, mctx;
 
   // ---------- panels ----------
-  const STATION_PANELS = ['board', 'workshop', 'display', 'market'];
+  const STATION_PANELS = ['board', 'workshop', 'display', 'market', 'crew'];
   const PANEL_ICONS = { album: 'album', wardrobe: 'hat_sunhat' };
 
   function onStation(id) {
@@ -46,7 +45,7 @@ RH.UI = (function () {
     const s = G().stats, S = G().S;
     const unlocked = S.heistsUnlocked[h.id];
     const freeGang = S.gangs.some((g) => !g.target);
-    const info = `<div class="row-sub">⏱ ${RH.fmtTime(s.heistTime(h))} · 💰 ${s.heistBags(h)} × 🪙${RH.fmt(h.bagValue)} · 🚨 +${Math.round(s.heistNoise(h))}% · 💎 ${Math.round(s.treasureChance(h) * 100)}%</div>`;
+    const info = `<div class="row-sub">⏱ ${RH.fmtTime(s.heistTime(h))} · ${RH.Sprites.html('h_' + h.id, h.emoji)} ${s.heistBags(h)} × ${COIN()}${RH.fmt(h.bagValue)} · 🚨 +${Math.round(s.heistNoise(h))}% · 💎 ${Math.round(s.treasureChance(h) * 100)}%</div>`;
     let btn;
     if (!unlocked) btn = coinBtn(S.coins >= h.unlock, 'unlock', h.id, h.unlock, '🔓 ' + t('unlockFor'));
     else btn = `<button class="btn ${freeGang ? 'go' : 'off'}" data-act="send" data-id="${h.id}">${freeGang ? t('send') : t('busy')}</button>`;
@@ -62,32 +61,37 @@ RH.UI = (function () {
     return `<div class="gang"><span>${h ? RH.Sprites.html('h_' + h.id, h.emoji) : '❔'} ${t('gang')} ${i + 1}</span><div class="bar"><div class="bar-fill" data-gang="${i}"></div></div><span class="gang-time" data-gang-time="${i}"></span>${rep}<button class="chip ad" data-act="instant" data-id="${i}">📺 ${t('instant')}</button></div>`;
   }
 
-  function moveBlock() {
+  // all districts: travel to unlocked ones, unlock the next one
+  function districtsBlock() {
     const S = G().S, s = G().stats;
-    const D = C.districts;
-    if (S.district >= D.length) return `<div class="move done">🏁 ${t('moveLast')}</div>`;
-    const next = D[S.district];
-    const ready = s.canMoveDistrict();
-    const cost = s.moveCost();
-    const bonus = Math.round(C.district.repBonus * S.district * 100);
-    return `<div class="move">
-      <div class="move-title">🚚 ${t('moveTitle')}: ${next.emoji} ${t('district_' + next.id)}</div>
-      <div class="row-sub">${t('moveKeep')}</div>
-      <div class="row-sub">${t('moveReset')}</div>
-      <div class="move-bonus">⭐ ${t('moveBonus')} +${bonus}%</div>
-      ${ready ? `<button class="btn wide ${S.coins >= cost ? 'go' : 'off'}" data-act="move">🚚 ${t('moveBtn')} · 🪙 ${RH.fmt(cost)}</button>`
-        : `<div class="move-need">🔒 ${t('moveNeed')}</div>`}
-    </div>`;
+    let html = `<div class="move"><div class="move-title">🗺️ ${t('districtsTitle')}</div><div class="row-sub">${t('travelHint')}</div>`;
+    C.districts.forEach((d, i) => {
+      const n = i + 1;
+      if (n > S.maxDistrict + 1) return;
+      const name = `${d.emoji} ${t('district_' + d.id)}`;
+      if (n === S.district) html += `<div class="drow here"><span>${name}</span><span class="chip on">📍 ${t('here')}</span></div>`;
+      else if (n <= S.maxDistrict) html += `<div class="drow"><span>${name}</span><button class="chip go" data-act="travel" data-id="${n}">🚚 ${t('travel')}</button></div>`;
+      else {
+        const ready = s.canMoveDistrict(), cost = s.moveCost();
+        html += `<div class="drow locked"><span>🔒 ${name}</span></div>
+          <div class="row-sub">${t('moveReset')}</div>
+          <div class="move-bonus">⭐ ${t('moveBonus')} +${Math.round(C.district.repBonus * S.maxDistrict * 100)}%</div>
+          ${ready ? coinBtn(S.coins >= cost, 'move', n, cost, '🚚 ' + t('moveBtn'))
+            : `<div class="move-need">🔒 ${S.district !== S.maxDistrict ? t('moveFromLast') : t('moveNeed')}</div>`}`;
+      }
+    });
+    if (S.maxDistrict >= C.districts.length) html += `<div class="row-sub">🏁 ${t('moveLast')}</div>`;
+    return html + '</div>';
   }
 
   function levelRow(icon, title, lv, desc, act, id, cost, maxed) {
     const S = G().S;
-    const btn = maxed ? `<button class="btn off">${t('max')}</button>` : coinBtn(S.coins >= cost, act, id, cost, lv === 0 && act === 'crew' ? t('hire') : '');
-    const lvTag = act === 'crew' && lv === 0 ? `<span class="lvl off">${t('notHired')}</span>` : `<span class="lvl">${t('lvl')} ${lv}</span>`;
+    const btn = maxed ? `<button class="btn off">${t('max')}</button>` : coinBtn(S.coins >= cost, act, id, cost);
+    const lvTag = `<span class="lvl">${t('lvl')} ${lv}</span>`;
     return `<div class="row"><div class="row-icon">${icon}</div><div class="row-main"><div class="row-title">${title} ${lvTag}</div><div class="row-sub">${desc}</div></div>${btn}</div>`;
   }
 
-  const UP_ICON = { car: 'van_van', bigBags: 'bag', gang: 'raccoon' };
+  const UP_ICON = { car: 'van_van', bigBags: 'bag', gang: 'raccoon', cashier: 'st_laundry' };
 
   function upgradeRows() {
     const S = G().S, s = G().stats;
@@ -97,10 +101,20 @@ RH.UI = (function () {
   }
   function crewRows() {
     const S = G().S, s = G().stats;
-    const lv = (c) => S.crew[c.id] || 0;
-    const price = (c) => (lv(c) >= c.max ? Infinity : s.crewCost(c.id));
-    return `<div class="legend">${t('crewHint')}</div>` + C.crew.slice().sort((a, b) => price(a) - price(b))
-      .map((c) => levelRow(RH.Sprites.raccoonHtml('crew_' + c.id), t('crew_' + c.id), lv(c), t('crewd_' + c.id), 'crew', c.id, s.crewCost(c.id), lv(c) >= c.max)).join('');
+    return `<div class="legend">${t('crewHint')}</div>` + C.crew.map((c) => {
+      const cr = S.crew[c.id] || { a: 0, b: 0 };
+      const head = `<div class="row-icon">${RH.Sprites.raccoonHtml('crew_' + c.id)}</div>`;
+      if (!cr.a) {
+        const cost = s.crewCost(c.id, 'a');
+        return `<div class="crew-card"><div class="row">${head}<div class="row-main"><div class="row-title">${t('crew_' + c.id)} <span class="lvl off">${t('notHired')}</span></div><div class="row-sub">${t('crewrole_' + c.id)}</div></div>${coinBtn(S.coins >= cost, 'crew', c.id + ':a', cost, t('hire'))}</div></div>`;
+      }
+      const skill = (k) => {
+        const lv = cr[k], maxed = s.crewMaxed(c.id, k), cost = s.crewCost(c.id, k);
+        const btn = maxed ? `<button class="btn off">${t('max')}</button>` : coinBtn(S.coins >= cost, 'crew', c.id + ':' + k, cost);
+        return `<div class="skill"><div class="row-main"><div class="row-title">${t('crew' + k + '_' + c.id)} <span class="lvl">${t('lvl')} ${lv}</span></div><div class="row-sub">${t('crew' + k + 'd_' + c.id)}</div></div>${btn}</div>`;
+      };
+      return `<div class="crew-card"><div class="row">${head}<div class="row-main"><div class="row-title">${t('crew_' + c.id)}</div><div class="row-sub">${t('crewrole_' + c.id)}</div></div></div>${skill('a')}${skill('b')}</div>`;
+    }).join('');
   }
 
   function treasureCard(tr, extra = '') {
@@ -141,9 +155,9 @@ RH.UI = (function () {
     const afford = (c) => (S.coins >= c ? 1 : 0);
     if (panelId === 'board') return base + S.gangs.map((g) => (g.target || '-') + g.repeat).join() + '|' + S.upgrades.loader + '|' +
       G().heists().map((h) => (S.heistsUnlocked[h.id] ? 1 : 0) + '' + afford(h.unlock) + Math.round(s.heistTime(h)) + s.heistBags(h)).join() +
-      '|' + afford(s.moveCost()) + s.canMoveDistrict();
-    if (panelId === 'workshop') return base + wsTab + '|' + C.upgrades.map((u) => S.upgrades[u.id] + ':' + afford(s.upgradeCost(u.id))).join() +
-      '|' + C.crew.map((c) => (S.crew[c.id] || 0) + ':' + afford(s.crewCost(c.id))).join();
+      '|' + afford(s.moveCost()) + s.canMoveDistrict() + S.maxDistrict;
+    if (panelId === 'workshop') return base + C.upgrades.map((u) => S.upgrades[u.id] + ':' + afford(s.upgradeCost(u.id))).join();
+    if (panelId === 'crew') return base + C.crew.map((c) => JSON.stringify(S.crew[c.id] || 0) + afford(s.crewCost(c.id, 'a')) + afford(s.crewCost(c.id, 'b'))).join();
     if (panelId === 'display') return base + S.displaySlots.join() + '|' + JSON.stringify(S.collection) + '|' + afford(s.slotCost() || Infinity);
     if (panelId === 'album') return base + JSON.stringify(S.collection);
     if (panelId === 'market') return base + S.marketBuys + afford(s.marketPrice(false)) + afford(s.marketPrice(true)) + Object.keys(S.collection).length;
@@ -158,10 +172,11 @@ RH.UI = (function () {
       html += `<div class="gangs">${S.gangs.map(gangRow).join('')}</div>`;
       html += `<div class="legend">${t('legend')}</div>`;
       html += G().heists().map(heistRow).join('');
-      html += moveBlock();
+      if (S.tutorial >= 6) html += districtsBlock();
     } else if (panelId === 'workshop') {
-      html += `<div class="tabs"><button class="tab ${wsTab === 'gear' ? 'on' : ''}" data-act="tab" data-id="gear">🛠️ ${t('tabGear')}</button><button class="tab ${wsTab === 'crew' ? 'on' : ''}" data-act="tab" data-id="crew">🦝 ${t('tabCrew')}</button></div>`;
-      html += wsTab === 'gear' ? upgradeRows() : crewRows();
+      html += upgradeRows();
+    } else if (panelId === 'crew') {
+      html += crewRows();
     } else if (panelId === 'display') {
       html += `<div class="slots">` + S.displaySlots.map((id, i) => {
         if (!id) return `<div class="slot empty">${t('emptySlot')}</div>`;
@@ -169,13 +184,14 @@ RH.UI = (function () {
         return `<div class="slot" style="--rc:${C.rarities[tr.rarity].color}"><div class="card-emoji">${RH.Sprites.html('t_' + tr.id, tr.emoji)}</div><div class="card-inc">+${RH.fmt(s.treasureIncome(id))}${t('perSec')}</div><button class="chip" data-act="remove" data-id="${i}">${t('remove')}</button></div>`;
       }).join('') + `</div>`;
       const cost = s.slotCost();
-      if (cost != null) html += `<button class="btn wide ${S.coins >= cost ? 'buy' : 'off'}" data-act="slot">➕ ${t('buySlot')} 🪙 ${RH.fmt(cost)}</button>`;
+      if (cost != null) html += `<button class="btn wide ${S.coins >= cost ? 'buy' : 'off'}" data-act="slot">➕ ${t('buySlot')} ${COIN()} ${RH.fmt(cost)}</button>`;
       const owned = C.treasures.filter((tr) => S.collection[tr.id] && !S.displaySlots.includes(tr.id));
       if (!Object.keys(S.collection).length) html += `<div class="empty-note">${t('noTreasures')}</div>`;
       else html += `<div class="grid">` + owned.map((tr) => treasureCard(tr, `<button class="chip" data-act="place" data-id="${tr.id}">${t('place')}</button>`)).join('') + `</div>`;
     } else if (panelId === 'market') {
       const p1 = s.marketPrice(false), p2 = s.marketPrice(true);
-      html += `<div class="legend">${t('marketHint')}</div>`;
+      const D = G().districtCfg();
+      html += `<div class="legend">${t('marketHint')} ${t('marketPool')} ${D.emoji} ${t('district_' + D.id)}.</div>`;
       html += `<div class="row"><div class="row-icon">${RH.Sprites.html('chest', '🎁')}</div><div class="row-main"><div class="row-title">${t('chestSmall')}</div><div class="row-sub odds">${oddsLine(C.market.rarity)}</div></div>${coinBtn(S.coins >= p1, 'chest', 'small', p1)}</div>`;
       html += `<div class="row"><div class="row-icon">${RH.Sprites.html('chest_big', '🧰')}</div><div class="row-main"><div class="row-title">${t('chestBig')}</div><div class="row-sub odds">${oddsLine(C.market.bigRarity)}</div></div>${coinBtn(S.coins >= p2, 'chest', 'big', p2)}</div>`;
       html += `<div class="album-count">📖 ${Object.keys(S.collection).length} / ${C.treasures.length}</div>`;
@@ -186,7 +202,11 @@ RH.UI = (function () {
     } else if (panelId === 'album') {
       const n = Object.keys(S.collection).length;
       html += `<div class="album-count">${n} / ${C.treasures.length}</div>`;
-      html += `<div class="grid">` + C.treasures.map((tr) => treasureCard(tr)).join('') + `</div>`;
+      C.districts.forEach((d, i) => {
+        const open = i < S.maxDistrict;
+        html += `<div class="section">${d.emoji} ${t('district_' + d.id)}${open ? '' : ' 🔒'}</div>`;
+        html += `<div class="grid">` + C.treasures.filter((tr) => tr.d === i).map((tr) => treasureCard(tr)).join('') + `</div>`;
+      });
       html += `<button class="btn wide danger" data-act="reset">🗑 ${t('reset')}</button>`;
     }
     $('#panel-body').innerHTML = html;
@@ -208,10 +228,10 @@ RH.UI = (function () {
 
   function confirmMove() {
     const S = G().S;
-    const next = C.districts[S.district];
+    const next = C.districts[S.maxDistrict];
     showModal(`<div class="m-emoji">🚚${next.emoji}</div><h2>${t('moveTitle')}: ${t('district_' + next.id)}</h2>
-      <p>✅ ${t('moveKeep')}</p><p>♻️ ${t('moveReset')}</p>
-      <div class="m-big">⭐ +${Math.round(C.district.repBonus * S.district * 100)}%</div><p>${t('moveBonus')}</p>
+      <p>✅ ${t('moveKeep')}</p><p>🆕 ${t('moveReset')}</p>
+      <div class="m-big">⭐ +${Math.round(C.district.repBonus * S.maxDistrict * 100)}%</div><p>${t('moveBonus')}</p>
       <div class="m-btns"><button class="btn off" data-m="no">${t('cancel')}</button><button class="btn go" data-m="yes">🚚 ${t('moveBtn')}</button></div>`, {
       no: hideModal,
       yes: () => {
@@ -232,8 +252,16 @@ RH.UI = (function () {
       case 'send': A.sendGang(id); break;
       case 'unlock': A.unlockHeist(id); break;
       case 'upgrade': A.buyUpgrade(id); break;
-      case 'crew': A.buyCrew(id); break;
-      case 'tab': wsTab = id; break;
+      case 'crew': { const [cid, sk] = id.split(':'); A.buyCrew(cid, sk); break; }
+      case 'travel': {
+        const d = +id, D = C.districts[d - 1];
+        const coins = A.travel(d);
+        if (coins != null) {
+          close();
+          toast(`<div class="toast-emoji">${D.emoji}</div><div><div class="toast-head">${t('district_' + D.id)}</div><div>${coins > 0 ? t('awayDistrict') + ' ' + RH.Sprites.html('coin', '🪙') + ' ' + RH.fmt(coins) : t('travelDone')}</div></div>`, '#7dffb2');
+        }
+        break;
+      }
       case 'repeat':
         if (G().S.upgrades.loader < 1) toast('🔒 ' + t('repeatLocked'));
         A.toggleRepeat(+id);
@@ -341,19 +369,60 @@ RH.UI = (function () {
     $('#btn-sound').textContent = RH.Audio.userMuted ? '🔇' : '🔊';
     $('#btn-lang').textContent = RH.lang.toUpperCase();
 
-    // tutorial hint
-    const step = S.tutorial;
-    const keys = ['tut_board', 'tut_wait', 'tut_garage', 'tut_laundry', 'tut_workshop'];
-    let hint = step < 5 ? t(keys[step]) : '';
-    if (step === 1 && S.garageBags.length) hint = t('tut_garage');
-    if (step === 3 && !S.carried.length) hint = '';
-    if (step === 4 && S.coins < Math.min(...C.upgrades.slice(0, 6).map((u) => s.upgradeCost(u.id)))) hint = '';
-    const th = $('#tut-hint');
-    th.textContent = hint;
-    th.style.display = hint && G().mode === 'hideout' ? '' : 'none';
+    updateTutorial();
 
     $('#hud').style.display = G().mode === 'chase' ? 'none' : '';
     drawMinimap();
+  }
+
+  // ---------- step-by-step tutorial ----------
+  // 0 board (press Go!) → 1 wait for the gang → 2 take loot in the stash → 3 put it on its stall
+  // → 4 take money at the register → 5 buy an upgrade → 6 done
+  let tutDomTarget = null;
+  function tutorialPointer() {
+    const S = G().S, step = S.tutorial;
+    if (step === 0 && panelId === 'board') return document.querySelector(`[data-act="send"][data-id="${G().heists()[0].id}"]`);
+    if (step === 5 && panelId === 'workshop') return document.querySelector('[data-act="upgrade"].buy');
+    return null;
+  }
+  function updateTutorial() {
+    const S = G().S, s = G().stats, step = S.tutorial;
+    const th = $('#tut-hint');
+    let hint = '';
+    if (step === 0) hint = panelId === 'board' ? t('tut_send') : t('tut_board');
+    else if (step === 1) {
+      const g = S.gangs.find((x) => x.target);
+      hint = S.garageBags.length || !g ? t('tut_garage') : t('tut_wait') + ' ' + RH.fmtTime(g.dur - g.t);
+    } else if (step === 2) hint = t('tut_garage');
+    else if (step === 3) hint = S.carried.length ? t('tut_stall') : t('tut_garage');
+    else if (step === 4) hint = G().queueLength() ? t('tut_register') : t('tut_wait_buyer');
+    else if (step === 5) {
+      const min = Math.min(...C.upgrades.slice(0, 6).map((u) => s.upgradeCost(u.id)));
+      hint = S.coins < min ? t('tut_more_money') : panelId === 'workshop' ? t('tut_buy') : t('tut_workshop');
+    }
+    if (step >= 6 && !S.tips.tutDone) {
+      S.tips.tutDone = 1;
+      showModal(`<div class="m-emoji">🦝🎉</div><h2>${t('tutDoneTitle')}</h2><p>${t('tutDoneText')}</p>
+        <div class="tut-goals"><div>🔓 ${t('tutGoal1')}</div><div>📦 ${t('tutGoal2')}</div><div>🏆 ${t('tutGoal3')}</div></div>
+        <div class="m-btns"><button class="btn go" data-m="ok">${t('tutDoneBtn')}</button></div>`, { ok: hideModal });
+    }
+    const show = hint && G().mode === 'hideout' && !modal;
+    const html = step < 6 ? `<span class="tut-num">${step + 1}/6</span>${hint}` : hint;
+    if (th.innerHTML !== html) th.innerHTML = html;
+    th.style.display = show ? '' : 'none';
+
+    // finger on the button to press inside a panel
+    const el = show ? tutorialPointer() : null;
+    if (tutDomTarget && tutDomTarget !== el) tutDomTarget.classList.remove('tut-pulse');
+    tutDomTarget = el;
+    const f = $('#tut-finger');
+    if (el) {
+      el.classList.add('tut-pulse');
+      const r = el.getBoundingClientRect();
+      f.style.left = r.left + r.width / 2 + 'px';
+      f.style.top = r.bottom - 6 + 'px';
+      f.style.display = 'block';
+    } else f.style.display = 'none';
   }
 
   function drawMinimap() {

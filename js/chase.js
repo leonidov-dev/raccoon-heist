@@ -10,7 +10,7 @@ RH.Chase = (function () {
   function begin(result, onDone) {
     st = {
       phase: 'intro', result, onDone,
-      t: 0, lane: 1, laneX: 1, lives: C.lives, coins: 0, objs: [], spawn: 0.8,
+      t: 0, lane: 1, laneX: 1, lives: RH.Game.stats.chaseLives(), coins: 0, objs: [], spawn: 0.8,
       scroll: 0, hitFlash: 0, speed: 1,
     };
     RH.UI.chaseIntro(

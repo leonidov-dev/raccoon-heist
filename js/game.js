@@ -27,26 +27,33 @@ RH.Game = (function () {
   const E = C.upgradeEffects;
   const CE = C.crewEffects;
   const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
-  const KEEP_PAID = 1e18; // marks a kept zone as bought in every district
 
   let S = null;            // saved state
   let canvas, ctx, dpr = 1, W = 0, H = 0;
   const cam = { x: 0, y: 0, scale: 1 };
   const player = { x: 0, y: 0, vx: 0, vy: 0, face: 1, bob: 0 };
   let helpers = [];
+  let crewBots = [];
+  let buyers = [];
+  let queue = [];
+  let spawnTimer = 1;
+  let serveTimer = 0;
   const floaters = [];
   let pickTimer = 0, dropTimer = 0;
   let currentStation = null;
   let time = 0;
   let mode = 'hideout';    // 'hideout' | 'chase'
   let drainAccum = 0;
+  let stillTime = 0;       // zones only take coins when the Boss stops on them
   let heistCache = { d: 0, list: [] };
 
   // ---------- district ----------
-  const districtCfg = () => C.districts[S.district - 1];
+  const districtCfg = (d = S.district) => C.districts[d - 1];
   const incomeMul = () => Math.pow(C.district.incomeBase, S.district - 1);
   const costMul = () => Math.pow(C.district.costBase, S.district - 1);
-  const repMul = () => 1 + C.district.repBonus * (S.district - 1);
+  // shared things (crew, display) scale with the furthest district reached
+  const globalCostMul = () => Math.pow(C.district.costBase, S.maxDistrict - 1);
+  const repMul = () => 1 + C.district.repBonus * (S.maxDistrict - 1);
 
   function heists() {
     if (heistCache.d !== S.district) {
@@ -55,7 +62,7 @@ RH.Game = (function () {
         d: S.district,
         list: districtCfg().targets.map(([id, emoji], i) => {
           const s = C.heistSlots[i];
-          return { id, emoji, time: s.time, bags: s.bags, bagValue: s.bagValue * m, noise: s.noise,
+          return { id, emoji, slot: i, time: s.time, bags: s.bags, bagValue: s.bagValue * m, noise: s.noise,
             unlock: RH.niceCost(s.unlock * m), treasure: s.treasure, rarity: s.rarity };
         }),
       };
@@ -66,7 +73,8 @@ RH.Game = (function () {
 
   // ---------- derived stats ----------
   const lvl = (id) => S.upgrades[id] || 0;
-  const crewLv = (id) => S.crew[id] || 0;
+  const crewA = (id) => (S.crew[id] ? S.crew[id].a : 0);
+  const crewB = (id) => (S.crew[id] ? S.crew[id].b : 0);
   const padLv = (id) => S.stationLv[id] || 0;
   const upCfg = (id) => C.upgrades.find((u) => u.id === id);
   const crewCfg = (id) => C.crew.find((u) => u.id === id);
@@ -77,28 +85,37 @@ RH.Game = (function () {
   const stationOn = (id) => !C.stations[id].needs || zoneBought(C.stations[id].needs);
 
   const stats = {
-    incomeMul, costMul, repMul,
+    incomeMul, costMul, repMul, globalCostMul,
     carryCap: () => C.player.baseCarry + E.backpackAdd * lvl('backpack'),
     speed: () => C.player.speed * (1 + E.speedAdd * lvl('speed')),
-    heistTime: (h) => Math.max(2, h.time * Math.pow(E.carTimeMul, lvl('car')) * Math.pow(CE.driverTime, crewLv('driver'))),
+    heistTime: (h) => Math.max(2, h.time * Math.pow(E.carTimeMul, lvl('car')) * Math.pow(CE.driverTime, crewA('driver'))),
     heistBags: (h) => h.bags + lvl('bigBags'),
-    heistNoise: (h) => h.noise * Math.pow(E.noiseMul, lvl('paws')) * Math.pow(CE.sneakNoise, crewLv('sneak')),
-    treasureChance: (h) => Math.min(0.9, h.treasure + E.noseAdd * lvl('nose') + CE.sneakTreasure * crewLv('sneak')),
+    heistNoise: (h) => h.noise * Math.pow(E.noiseMul, lvl('paws')) * Math.pow(CE.sneakNoise, crewA('sneak')),
+    treasureChance: (h) => Math.min(0.9, h.treasure + E.noseAdd * lvl('nose') + CE.sneakTreasure * crewB('sneak')),
     gangCount: () => 1 + lvl('gang'),
+    cashierServe: () => C.shop.serveCashier / (1 + 0.5 * (lvl('cashier') - 1)),
+    chaseLives: () => C.chase.lives + CE.driverLives * crewB('driver'),
+    muscleCarry: () => CE.muscleCarry * (1 + crewB('muscle')),
+    offlineCap: () => C.offlineCapSec + CE.hackerOffline * crewB('hacker'),
     boostMul: () => (Date.now() < S.boostUntil ? C.rewards.boostMul : 1),
     // coins per bag value (everything except the temporary boost)
     bagCoinMul: () => (1 + (zoneBought('washer2') ? zoneCfg('washer2').laundryBonus : 0)) *
-      (1 + padCfg('laundry').effect * padLv('laundry')) * (1 + CE.muscleCoins * crewLv('muscle')) * repMul(),
-    displayMul: () => costMul() * (1 + padCfg('display').effect * padLv('display')) *
-      (1 + CE.hackerDisplay * crewLv('hacker')) * repMul(),
+      (1 + padCfg('laundry').effect * padLv('laundry')) * (1 + CE.muscleCoins * crewA('muscle')) * repMul(),
+    displayMul: () => globalCostMul() * (1 + padCfg('display').effect * padLv('display')) *
+      (1 + CE.hackerDisplay * crewA('hacker')) * repMul(),
     coolMul: () => (zoneBought('cooler') ? zoneCfg('cooler').coolMul : 1),
     upgradeCost: (id) => RH.niceCost(upCfg(id).base * Math.pow(upCfg(id).growth, lvl(id)) * costMul()),
-    crewCost: (id) => RH.niceCost(crewCfg(id).hire * Math.pow(crewCfg(id).growth, crewLv(id)) * costMul()),
+    crewCost: (id, skill) => {
+      const c = crewCfg(id);
+      const raw = skill === 'a' ? c.hire * Math.pow(c.a.growth, Math.max(0, crewA(id) - 1)) : c.b.base * Math.pow(c.b.growth, crewB(id));
+      return RH.niceCost(raw * globalCostMul());
+    },
+    crewMaxed: (id, skill) => (skill === 'a' ? crewA(id) >= crewCfg(id).a.max : crewB(id) >= crewCfg(id).b.max),
     padCost: (id) => RH.niceCost(padCfg(id).base * Math.pow(padCfg(id).growth, padLv(id)) * costMul()),
     marketPrice: (big) => RH.niceCost(C.market.base * Math.pow(C.market.growth, S.marketBuys) * incomeMul() * (big ? C.market.bigMul : 1)),
     slotCost: () => C.display.slotCosts[S.displaySlots.length - C.display.startSlots],
     moveCost: () => RH.niceCost(C.district.moveCost * incomeMul()),
-    canMoveDistrict: () => S.district < C.districts.length && heists().every((h) => S.heistsUnlocked[h.id]),
+    canMoveDistrict: () => S.maxDistrict < C.districts.length && S.district === S.maxDistrict && heists().every((h) => S.heistsUnlocked[h.id]),
     stars: (id) => {
       const c = S.collection[id] || 0;
       let s = 0;
@@ -145,6 +162,43 @@ RH.Game = (function () {
     return weights.length - 1;
   }
 
+  const goodsSprite = (item) => { const h = heists()[item.k]; return h ? 'h_' + h.id : 'bag'; };
+  const goodsEmoji = (item) => { const h = heists()[item.k]; return h ? h.emoji : '💰'; };
+  const stallRect = (i) => ({ x: C.shop.stalls[i][0], y: C.shop.stalls[i][1], w: C.shop.stallW, h: C.shop.stallH });
+  const stallOpen = (i) => { const h = heists()[i]; return !!(h && S.heistsUnlocked[h.id]); };
+  const stallSpace = (i) => C.shop.stallCap - S.stalls[i].length;
+
+  // ---------- districts: travel / unlock ----------
+  function stashDistrict() {
+    const ds = {};
+    RH.Save.DISTRICT_KEYS.forEach((k) => (ds[k] = S[k]));
+    ds.seen = Date.now();
+    S.dist[districtCfg().id] = ds;
+  }
+  function enterDistrict(d, fresh) {
+    S.district = d;
+    const id = districtCfg().id;
+    const keep = {};
+    C.buyZones.forEach((z) => { if (z.keep && (S.zones[z.id] || 0) >= RH.Save.KEEP_PAID) keep[z.id] = RH.Save.KEEP_PAID; });
+    const ds = fresh || !S.dist[id] ? RH.Save.districtState(d, keep) : S.dist[id];
+    delete S.dist[id];
+    Object.assign(S, ds);
+    C.buyZones.forEach((z) => { if (keep[z.id]) S.zones[z.id] = keep[z.id]; });
+    heistCache.d = 0;
+    helpers = [];
+    syncHelpers();
+    crewBots = [];
+    syncCrew();
+    buyers = [];
+    queue = [];
+    player.x = C.startPos.x; player.y = C.startPos.y;
+    currentStation = null;
+    RH.UI.onStation(null);
+    // catch up what the gangs on repeat did here while we were away
+    const away = Math.min((Date.now() - (ds.seen || Date.now())) / 1000, stats.offlineCap());
+    return fresh ? 0 : catchUp(away);
+  }
+
   // ---------- actions ----------
   const actions = {
     sendGang(heistId) {
@@ -169,13 +223,16 @@ RH.Game = (function () {
       S.upgrades[id]++;
       if (id === 'gang') S.gangs.push(RH.Save.newGang());
       if (id === 'loader') syncHelpers();
-      if (S.tutorial === 4) S.tutorial = 5;
+      if (S.tutorial === 5) S.tutorial = 6;
       floater(player.x, player.y - 70, RH.t('up_' + id) + ' ↑', '#7dffb2', 22);
       return true;
     },
-    buyCrew(id) {
-      if (crewLv(id) >= crewCfg(id).max || !spend(stats.crewCost(id))) return false;
-      S.crew[id] = crewLv(id) + 1;
+    buyCrew(id, skill) {
+      if (skill === 'b' && crewA(id) < 1) return false;
+      if (stats.crewMaxed(id, skill) || !spend(stats.crewCost(id, skill))) return false;
+      const c = S.crew[id] || (S.crew[id] = { a: 0, b: 0 });
+      c[skill]++;
+      syncCrew();
       floater(player.x, player.y - 70, RH.t('crew_' + id) + ' ↑', '#7dffb2', 22);
       return true;
     },
@@ -209,8 +266,7 @@ RH.Game = (function () {
       grantTreasure(weightedPick(big ? C.market.bigRarity : C.market.rarity));
     },
     buyCosmetic(kind, id) {
-      const list = C.cosmetics[kind];
-      const item = list.find((x) => x.id === id);
+      const item = C.cosmetics[kind].find((x) => x.id === id);
       const owned = S.cosmetics[kind];
       const key = kind === 'hats' ? 'hat' : 'van';
       if (!owned.includes(id)) {
@@ -219,20 +275,25 @@ RH.Game = (function () {
       } else RH.Audio.pick();
       S.cosmetics[key] = id;
     },
+    // unlock the next district (costs coins, needs all heists here) and go there
     moveDistrict() {
-      if (!stats.canMoveDistrict() || S.coins < stats.moveCost()) { RH.Audio.deny(); return false; }
-      const keepZones = {};
-      C.buyZones.forEach((z) => { if (z.keep && zoneBought(z.id)) keepZones[z.id] = KEEP_PAID; });
-      Object.assign(S, RH.Save.districtState(S.district + 1));
-      S.district++;
-      S.zones = keepZones;
-      helpers = [];
-      player.x = C.startPos.x; player.y = C.startPos.y;
-      heistCache.d = 0;
-      currentStation = null;
+      if (!stats.canMoveDistrict() || !spend(stats.moveCost())) return false;
+      stashDistrict();
+      S.maxDistrict++;
+      enterDistrict(S.maxDistrict, true);
       RH.Audio.treasure();
       RH.Poki.commercialBreak();
       return true;
+    },
+    // travel to an already unlocked district; returns coins the gangs made there meanwhile
+    travel(d) {
+      if (d === S.district || d < 1 || d > S.maxDistrict || mode !== 'hideout') return null;
+      stashDistrict();
+      const coins = enterDistrict(d, false);
+      if (coins > 0) addCoins(coins);
+      RH.Audio.send();
+      RH.Poki.commercialBreak();
+      return coins;
     },
     openChest() {
       if (Date.now() < S.chestReadyAt) return;
@@ -259,8 +320,10 @@ RH.Game = (function () {
     g.hot = S.heat >= C.heat.max; // this heist woke up the cops -> chase on return
   }
 
+  // treasures of the current district only
   function grantTreasure(rarity) {
-    const pool = C.treasures.filter((t) => t.rarity === rarity);
+    const d = S.district - 1;
+    const pool = C.treasures.filter((t) => t.rarity === rarity && t.d === d);
     const t = pool[Math.floor(Math.random() * pool.length)];
     const isNew = !S.collection[t.id];
     const oldStars = stats.stars(t.id);
@@ -279,7 +342,7 @@ RH.Game = (function () {
     g.target = null;
     g.t = 0;
     if (!h) return;
-    const result = { bags: g.bags, bagValue: g.bagValue, heist: h };
+    const result = { bags: g.bags, bagValue: g.bagValue, heist: h, k: h.slot };
     if (Math.random() < stats.treasureChance(h)) grantTreasure(weightedPick(h.rarity));
     RH.Audio.arrive();
     const hot = g.hot;
@@ -287,12 +350,14 @@ RH.Game = (function () {
     if (hot && mode === 'hideout' && !RH.UI.modalOpen()) {
       RH.Audio.siren();
       RH.Chase.begin(result, (res) => {
+        // the chase clears the wanted level for EVERY gang (heists launched while it was 100% included)
         S.heat = 0;
+        S.gangs.forEach((x) => (x.hot = false));
         let bags = result.bags;
         let value = result.bagValue;
         if (res.success) value = Math.round(value * (1 + C.chase.successBonus));
         else bags = Math.ceil(bags * (1 - C.chase.failLoss));
-        for (let i = 0; i < bags; i++) S.garageBags.push(value);
+        for (let i = 0; i < bags; i++) S.garageBags.push({ k: result.k, v: value });
         if (res.bonusCoins) addCoins(res.bonusCoins);
         mode = 'hideout';
         RH.Input.resetJoystick();
@@ -300,82 +365,207 @@ RH.Game = (function () {
       });
       mode = 'chase';
     } else {
-      for (let i = 0; i < result.bags; i++) S.garageBags.push(result.bagValue);
+      for (let i = 0; i < result.bags; i++) S.garageBags.push({ k: result.k, v: result.bagValue });
     }
     if (g.repeat && lvl('loader') > 0) launch(g, h);
   }
 
-  // ---------- helpers (loader raccoons) ----------
+  // ---------- loader raccoons ----------
   function syncHelpers() {
     while (helpers.length < lvl('loader')) {
       const st = C.stations.garage;
       helpers.push({ x: st.x - 40 + helpers.length * 30, y: st.y + 60, carry: [], state: 'toGarage', drop: 0, bob: Math.random() * 6 });
     }
   }
+  // walk a carrier between the stash and the stalls; cap = goods per trip
+  function carrierStep(hp, i, dt, cap, sp) {
+    const G = C.stations.garage;
+    let tgt;
+    if (hp.state === 'toGarage') tgt = { x: G.x - 80 + (i % 6) * 32, y: G.y + 40 };
+    else {
+      const k = hp.carry.length ? hp.carry[0].k : 0;
+      const r = stallRect(k);
+      tgt = { x: r.x - 30 + (i % 3) * 30, y: r.y - r.h / 2 - 16 };
+    }
+    const dx = tgt.x - hp.x, dy = tgt.y - hp.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 6) {
+      hp.x += (dx / d) * Math.min(d, sp * dt);
+      hp.y += (dy / d) * Math.min(d, sp * dt);
+      hp.bob += dt * 12;
+      hp.face = dx < 0 ? -1 : 1;
+    } else if (hp.state === 'toGarage') {
+      // take only goods whose stall has room
+      const room = [0, 1, 2, 3].map((k) => stallSpace(k));
+      for (let j = S.garageBags.length - 1; j >= 0 && hp.carry.length < cap; j--) {
+        const it = S.garageBags[j];
+        if (room[it.k] > 0) { room[it.k]--; hp.carry.push(it); S.garageBags.splice(j, 1); }
+      }
+      if (hp.carry.length) { hp.carry.sort((a, b) => a.k - b.k); hp.state = 'toStall'; }
+    } else {
+      hp.drop -= dt;
+      const k = hp.carry.length ? hp.carry[0].k : -1;
+      if (k >= 0 && hp.drop <= 0) {
+        if (stallSpace(k) > 0) { S.stalls[k].push(hp.carry.shift().v); hp.drop = C.player.dropInterval * 1.5; RH.Audio.pick(); }
+        else S.garageBags.push(...hp.carry.splice(0, hp.carry.filter((x) => x.k === k).length)); // full: put back
+      }
+      if (!hp.carry.length) hp.state = 'toGarage';
+    }
+  }
   function updateHelpers(dt) {
-    const G = C.stations.garage, L = C.stations.laundry;
-    helpers.forEach((hp, i) => {
-      const tgt = hp.state === 'toGarage' ? { x: G.x - 70 + i * 35, y: G.y + 40 } : { x: L.x - 70 + i * 35, y: L.y - 20 };
-      const dx = tgt.x - hp.x, dy = tgt.y - hp.y;
+    const sp = C.helper.speed * (1 + E.speedAdd * lvl('speed') * 0.5);
+    helpers.forEach((hp, i) => carrierStep(hp, i, dt, C.helper.carry, sp));
+  }
+
+  // ---------- crew walking around the hideout ----------
+  const ST = C.stations;
+  const CREW_ROUTES = {
+    driver: [[ST.crew.x + 40, ST.crew.y + 30], [ST.garage.x - 110, ST.garage.y + 130], [ST.board.x + 140, ST.board.y + 40]],
+    hacker: [[ST.crew.x - 50, ST.crew.y - 10], [ST.crew.x - 50, ST.crew.y - 10], [ST.display.x, ST.display.y + 120]],
+  };
+  function syncCrew() {
+    C.crew.forEach((c, i) => {
+      if (crewA(c.id) < 1 || crewBots.some((b) => b.id === c.id)) return;
+      crewBots.push({ id: c.id, emoji: c.emoji, x: ST.crew.x - 60 + i * 40, y: ST.crew.y + 20, tx: null, ty: null,
+        wait: Math.random() * 2, step: 0, bob: 0, face: 1, carry: [], state: 'toGarage', drop: 0 });
+    });
+  }
+  function pickCrewTarget(b) {
+    if (b.id === 'sneak') {
+      // tiptoes around the whole hideout
+      b.tx = 120 + Math.random() * (C.world.w - 240);
+      b.ty = 140 + Math.random() * (C.world.h - 280);
+    } else {
+      const r = CREW_ROUTES[b.id];
+      b.step = (b.step + 1) % r.length;
+      [b.tx, b.ty] = r[b.step];
+    }
+    b.wait = b.id === 'hacker' && b.step < 2 ? 4 + Math.random() * 4 : 1 + Math.random() * 2.5;
+  }
+  function updateCrew(dt) {
+    crewBots.forEach((b, i) => {
+      if (b.id === 'muscle') {
+        carrierStep(b, 3 + i, dt, stats.muscleCarry(), CE.speed);
+        return;
+      }
+      if (b.tx == null) { pickCrewTarget(b); return; }
+      const dx = b.tx - b.x, dy = b.ty - b.y;
       const d = Math.hypot(dx, dy);
-      const sp = C.helper.speed * (1 + E.speedAdd * lvl('speed') * 0.5);
-      if (d > 6) {
-        hp.x += (dx / d) * Math.min(d, sp * dt);
-        hp.y += (dy / d) * Math.min(d, sp * dt);
-        hp.bob += dt * 12;
-        hp.face = dx < 0 ? -1 : 1;
-      } else if (hp.state === 'toGarage') {
-        if (S.garageBags.length) {
-          while (hp.carry.length < C.helper.carry && S.garageBags.length) hp.carry.push(S.garageBags.pop());
-          hp.state = 'toLaundry';
-        }
+      if (d > 5) {
+        const sp = b.id === 'sneak' ? CE.speed * 0.7 : CE.speed;
+        b.x += (dx / d) * Math.min(d, sp * dt);
+        b.y += (dy / d) * Math.min(d, sp * dt);
+        b.bob += dt * (b.id === 'sneak' ? 7 : 11);
+        b.face = dx < 0 ? -1 : 1;
       } else {
-        hp.drop -= dt;
-        if (hp.drop <= 0 && hp.carry.length) {
-          hp.drop = C.player.dropInterval * 1.5;
-          launder(hp.carry.pop(), hp.x, hp.y - 30);
-        }
-        if (!hp.carry.length) hp.state = 'toGarage';
+        b.bob = 0;
+        b.wait -= dt;
+        if (b.wait <= 0) pickCrewTarget(b);
       }
     });
   }
 
-  function launder(value, x, y) {
-    const coins = Math.round(value * stats.bagCoinMul() * stats.boostMul());
-    addCoins(coins);
-    floater(x + (Math.random() - 0.5) * 40, y, '+' + RH.fmt(coins));
-    RH.Audio.coin();
+  // ---------- shop: buyers take goods from stalls and pay at the register ----------
+  const REG = C.stations.laundry;
+  const queueSpot = (i) => ({ x: C.shop.queue[0] + C.shop.queue[2] * i, y: C.shop.queue[1] });
+  function moveTo(b, x, y, dt) {
+    const dx = x - b.x, dy = y - b.y, d = Math.hypot(dx, dy);
+    if (d <= 4) { b.bob = 0; return true; }
+    const step = Math.min(d, C.shop.buyerSpeed * dt);
+    b.x += (dx / d) * step; b.y += (dy / d) * step;
+    b.bob += dt * 11; b.face = dx < 0 ? -1 : 1;
+    return false;
+  }
+  function pickStall() {
+    const open = [0, 1, 2, 3].filter((k) => stallOpen(k) && S.stalls[k].length);
+    return open.length ? open[Math.floor(Math.random() * open.length)] : -1;
+  }
+  function updateShop(dt, bossAtRegister) {
+    spawnTimer -= dt;
+    if (spawnTimer <= 0 && buyers.length < C.shop.maxBuyers && pickStall() >= 0) {
+      spawnTimer = C.shop.spawnEvery * (0.7 + Math.random() * 0.6);
+      const t = Math.floor(Math.random() * C.shop.buyers.length);
+      buyers.push({ x: C.shop.door[0], y: C.shop.door[1] + (Math.random() - 0.5) * 60, kind: t, state: 'toStall', stall: pickStall(),
+        items: [], wait: 0, bob: 0, face: -1 });
+    }
+    buyers.forEach((b) => {
+      if (b.state === 'toStall') {
+        const r = stallRect(b.stall);
+        if (moveTo(b, r.x + (b.kind - 1) * 26, r.y + r.h / 2 + 40, dt)) { b.state = 'take'; b.wait = 0.5; }
+      } else if (b.state === 'take') {
+        b.wait -= dt;
+        if (b.wait > 0) return;
+        const want = C.shop.take[0] + Math.floor(Math.random() * (C.shop.take[1] - C.shop.take[0] + 1));
+        const st = S.stalls[b.stall];
+        while (b.items.length < want && st.length) b.items.push({ k: b.stall, v: st.pop() });
+        if (b.items.length) { b.state = 'queue'; queue.push(b); }
+        else { const k = pickStall(); if (k >= 0) { b.stall = k; b.state = 'toStall'; } else b.state = 'leave'; }
+      } else if (b.state === 'queue') {
+        const i = queue.indexOf(b);
+        const p = queueSpot(i);
+        moveTo(b, p.x, p.y, dt);
+      } else if (b.state === 'leave') {
+        if (moveTo(b, C.shop.door[0] + 40, C.shop.door[1], dt)) b.gone = true;
+      }
+    });
+    buyers = buyers.filter((b) => !b.gone);
+
+    // serving the queue: the Boss is fast, a hired cashier is slower
+    const front = queue[0];
+    const ready = front && Math.hypot(front.x - queueSpot(0).x, front.y - queueSpot(0).y) < 8;
+    const serving = bossAtRegister ? C.shop.serveBoss : lvl('cashier') > 0 ? stats.cashierServe() : 0;
+    if (ready && serving) {
+      serveTimer += dt;
+      if (serveTimer >= serving) {
+        serveTimer = 0;
+        queue.shift();
+        const sum = front.items.reduce((a, it) => a + it.v, 0);
+        const coins = Math.round(sum * stats.bagCoinMul() * stats.boostMul());
+        addCoins(coins);
+        floater(REG.x + (Math.random() - 0.5) * 50, REG.y - 70, '+' + RH.fmt(coins));
+        RH.Audio.coin();
+        front.items = [];
+        front.state = 'leave';
+        if (S.tutorial === 4) S.tutorial = 5;
+      }
+    } else serveTimer = 0;
   }
 
-  // ---------- offline progress ----------
-  function applyOffline() {
-    const now = Date.now();
-    const elapsed = Math.min((now - (S.lastSeen || now)) / 1000, C.offlineCapSec);
+  // ---------- away / offline progress of the current district ----------
+  // Gangs finish their heists; gangs on repeat (with a loader) keep robbing and their loot is
+  // cashed in directly. Returns the coins made (not added yet).
+  function catchUp(elapsed) {
     if (elapsed < 1) return 0;
-    let coins = stats.displayIncome(false) * elapsed;
+    let coins = 0;
     S.gangs.forEach((g) => {
       if (!g.target) return;
       const h = heistCfg(g.target);
       if (!h) { g.target = null; return; }
       const remaining = g.dur - g.t;
       if (elapsed < remaining) { g.t += elapsed; return; }
-      for (let i = 0; i < g.bags; i++) S.garageBags.push(g.bagValue);
-      g.hot = false;
+      for (let i = 0; i < g.bags; i++) S.garageBags.push({ k: h.slot, v: g.bagValue });
       if (g.repeat && lvl('loader') > 0) {
         const after = elapsed - remaining;
         const dur = stats.heistTime(h);
         const runs = Math.floor(after / dur);
         coins += runs * stats.heistBags(h) * h.bagValue * stats.bagCoinMul();
         launch(g, h);
-        g.hot = false;
         g.t = after - runs * dur;
       } else {
         g.target = null;
         g.t = 0;
       }
+      g.hot = false;
     });
     S.heat = Math.max(0, S.heat - C.heat.coolPerSec * stats.coolMul() * elapsed);
-    coins = Math.floor(coins);
+    return Math.floor(coins);
+  }
+
+  function applyOffline() {
+    const now = Date.now();
+    const elapsed = Math.min((now - (S.lastSeen || now)) / 1000, stats.offlineCap());
+    if (elapsed < 1) return 0;
+    const coins = Math.floor(stats.displayIncome(false) * elapsed) + catchUp(elapsed);
     if (elapsed >= C.offlineMinSec && coins > 0) return coins;
     addCoins(coins);
     return 0;
@@ -424,15 +614,14 @@ RH.Game = (function () {
     player.x = Math.max(40, Math.min(C.world.w - 40, player.x + player.vx * dt));
     player.y = Math.max(50, Math.min(C.world.h - 30, player.y + player.vy * dt));
     if (Math.abs(mv.x) > 0.1) player.face = mv.x < 0 ? -1 : 1;
-    if (mv.x || mv.y) player.bob += dt * 14; else player.bob = 0;
+    if (mv.x || mv.y) { player.bob += dt * 14; stillTime = 0; } else { player.bob = 0; stillTime += dt; }
     S.player.x = player.x; S.player.y = player.y;
 
     // stations
-    const st = C.stations;
     let here = null;
-    for (const id in st) {
+    for (const id in ST) {
       if (!stationOn(id)) continue;
-      if (inRect(player.x, player.y, st[id], 10)) { here = id; break; }
+      if (inRect(player.x, player.y, ST[id], 10)) { here = id; break; }
     }
     if (here !== currentStation) {
       currentStation = here;
@@ -447,22 +636,32 @@ RH.Game = (function () {
       RH.Audio.pick();
       if (S.tutorial <= 2) S.tutorial = 3;
     }
-    if (here === 'laundry' && S.carried.length && dropTimer <= 0) {
-      launder(S.carried.pop(), st.laundry.x, st.laundry.y - 40);
-      dropTimer = C.player.dropInterval;
-      if (S.tutorial === 3 && !S.carried.length) S.tutorial = 4;
+    // put goods on the stall you stand at (only goods of that stall)
+    for (let k = 0; k < 4; k++) {
+      if (!stallOpen(k) || !inRect(player.x, player.y, stallRect(k), 14)) continue;
+      const j = S.carried.findIndex((it) => it.k === k);
+      if (j >= 0 && stallSpace(k) > 0 && dropTimer <= 0) {
+        S.stalls[k].push(S.carried.splice(j, 1)[0].v);
+        dropTimer = C.player.dropInterval;
+        RH.Audio.pick();
+        if (S.tutorial === 3) S.tutorial = 4;
+      }
     }
+    updateShop(dt, here === 'laundry');
     if (S.tutorial === 1 && S.garageBags.length) S.tutorial = 2;
 
     // buy zones and level pads
-    let draining = false;
-    for (const z of C.buyZones) {
+    const standing = stillTime >= 0.25; // walking through a zone never pays
+    let draining = !standing;
+    for (const z of standing ? C.buyZones : []) {
       if (zoneBought(z.id) || !inRect(player.x, player.y, z, 0)) continue;
       draining = true;
       S.zones[z.id] = drain(dt, zoneCost(z), S.zones[z.id] || 0, () => {
+        if (z.keep) S.zones[z.id] = RH.Save.KEEP_PAID;
         floater(z.x, z.y - 40, '✨ ' + RH.t('zone_' + z.id) + '!', '#7dffb2', 30);
-        RH.UI.toast(`<div class="toast-emoji">${z.emoji}</div><div><div class="toast-head">${RH.t('zone_' + z.id)}</div><div>${RH.t('zoned_' + z.id)}</div></div>`, '#7dffb2');
+        RH.UI.toast(`<div class="toast-emoji">${RH.Sprites.html(zoneSprite(z), z.emoji)}</div><div><div class="toast-head">${RH.t('zone_' + z.id)}</div><div>${RH.t('zoned_' + z.id)}</div></div>`, '#7dffb2');
       });
+      if (z.keep && (S.zones[z.id] || 0) >= zoneCost(z)) S.zones[z.id] = RH.Save.KEEP_PAID;
       break;
     }
     if (!draining) for (const p of C.levelPads) {
@@ -478,9 +677,10 @@ RH.Game = (function () {
       } else S.padPaid[p.id] = paid;
       break;
     }
-    if (!draining) drainAccum = 0;
+    if (!standing) drainAccum = 0;
 
     updateHelpers(dt);
+    updateCrew(dt);
 
     for (let i = floaters.length - 1; i >= 0; i--) {
       floaters[i].life -= dt;
@@ -520,26 +720,74 @@ RH.Game = (function () {
     ctx.fillText(s, x, y);
   }
 
+  function drawFloorPattern(D) {
+    const { w, h } = C.world;
+    const [a, b] = D.tiles;
+    ctx.fillStyle = a;
+    ctx.fillRect(0, 0, w, h);
+    if (D.floor === 'checker') {
+      for (let y = 0; y < h; y += 100) for (let x = 0; x < w; x += 100) {
+        if (((x + y) / 100) % 2) continue;
+        ctx.fillStyle = b; ctx.fillRect(x, y, 100, 100);
+      }
+    } else if (D.floor === 'grid') {
+      ctx.strokeStyle = 'rgba(63,216,208,0.22)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (let x = 0; x <= w; x += 80) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }
+      for (let y = 0; y <= h; y += 80) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,111,181,0.35)';
+      for (let y = 0; y <= h; y += 80) for (let x = 0; x <= w; x += 80) ctx.fillRect(x - 3, y - 3, 6, 6);
+    } else if (D.floor === 'tiles') {
+      for (let y = 0; y < h; y += 60) for (let x = 0; x < w; x += 60) {
+        ctx.fillStyle = ((x / 60 + y / 60) % 3) ? a : b;
+        ctx.fillRect(x + 2, y + 2, 56, 56);
+      }
+    } else if (D.floor === 'parquet') {
+      for (let y = 0; y < h; y += 60) for (let x = 0; x < w; x += 120) {
+        const odd = (y / 60) % 2;
+        ctx.fillStyle = odd ? b : a;
+        ctx.fillRect(x + (odd ? 60 : 0) - 60, y, 118, 58);
+        ctx.fillStyle = 'rgba(0,0,0,0.12)';
+        ctx.fillRect(x + (odd ? 60 : 0) - 60, y + 56, 118, 4);
+      }
+    } else if (D.floor === 'planks') {
+      for (let y = 0; y < h; y += 50) {
+        const off = ((y / 50) % 3) * 70;
+        for (let x = -off; x < w; x += 210) {
+          ctx.fillStyle = ((x + y) / 10) % 2 ? a : b;
+          ctx.fillRect(x, y, 206, 46);
+          ctx.fillStyle = 'rgba(0,0,0,0.25)';
+          ctx.fillRect(x + 8, y + 20, 4, 4); ctx.fillRect(x + 194, y + 20, 4, 4);
+        }
+      }
+    }
+    // central rug under the sign
+    ctx.fillStyle = D.rug + '30';
+    ctx.strokeStyle = D.rug + '80';
+    ctx.lineWidth = 6;
+    rr(900 - 260, 360, 520, 160, 40);
+    ctx.fill();
+    ctx.stroke();
+  }
+
   function drawFloor() {
     const { w, h } = C.world;
     const D = districtCfg();
     ctx.fillStyle = D.outside;
-    ctx.fillRect(-400, -400, w + 800, h + 800);
+    ctx.fillRect(-500, -500, w + 1000, h + 1000);
     if (D.sea) {
       ctx.fillStyle = '#4fd3e6';
-      ctx.fillRect(-400, h + 90, w + 800, 400);
+      ctx.fillRect(-500, h + 90, w + 1000, 500);
       ctx.fillStyle = 'rgba(255,255,255,0.5)';
-      for (let i = -400; i < w + 400; i += 80) {
+      for (let i = -500; i < w + 500; i += 80) {
         const yy = h + 90 + Math.sin(time * 2 + i * 0.05) * 6;
         ctx.fillRect(i, yy, 50, 6);
       }
     }
-    [[-80, 100], [-90, 600], [w + 80, 120], [w + 70, 560], [w + 90, 900], [-70, 920]].forEach(([x, y]) => emoji(D.deco, x, y, 80));
-    const tile = 100;
-    for (let y = 0; y < h; y += tile) for (let x = 0; x < w; x += tile) {
-      ctx.fillStyle = ((x + y) / tile) % 2 ? D.tiles[0] : D.tiles[1];
-      ctx.fillRect(x, y, tile, tile);
-    }
+    [[-80, 100], [-90, 600], [w + 80, 120], [w + 70, 560], [w + 90, 900], [-70, 1000]].forEach(([x, y]) => emoji(D.deco, x, y, 80));
+    drawFloorPattern(D);
     ctx.lineWidth = 10;
     ctx.strokeStyle = D.wall;
     ctx.shadowColor = D.wall;
@@ -547,11 +795,14 @@ RH.Game = (function () {
     rr(0, 0, w, h, 24);
     ctx.stroke();
     ctx.shadowBlur = 0;
+    drawDoor();
+    // interior decor of this district
+    C.decorSpots.forEach(([x, y], i) => RH.Sprites.draw(ctx, D.decor[i % D.decor.length], '', x, y, 96));
     const glow = 0.75 + Math.sin(time * 3) * 0.25;
     ctx.globalAlpha = glow;
-    text('RACCOON HQ', w / 2, 360, 46, '#3fd8d0', 900);
+    text('RACCOON HQ', 900, 420, 50, D.sign, 900);
     ctx.globalAlpha = 1;
-    text(D.emoji + ' ' + RH.t('district_' + D.id), w / 2, 402, 20, '#fff');
+    text(D.emoji + ' ' + RH.t('district_' + D.id), 900, 470, 22, '#fff');
   }
 
   function drawStation(id, s) {
@@ -577,7 +828,8 @@ RH.Game = (function () {
       const shown = Math.min(n, 18);
       for (let i = 0; i < shown; i++) {
         const col = i % 6, row = Math.floor(i / 6);
-        RH.Sprites.draw(ctx, 'bag', '💰', s.x - 90 + col * 24, s.y + 55 - row * 22, 30);
+        const it = S.garageBags[i];
+        RH.Sprites.draw(ctx, goodsSprite(it), goodsEmoji(it), s.x - 90 + col * 24, s.y + 55 - row * 22, 30);
       }
       if (n) text('×' + n, s.x + 70, s.y + 40, 26, '#fff');
     } else if (id === 'display') {
@@ -617,6 +869,13 @@ RH.Game = (function () {
     rr(r.x - r.w / 2, r.y + r.h / 2 - r.h * p, r.w, r.h * p, 14);
     ctx.fill();
   }
+  function coinText(amount, x, y, size) {
+    const s = RH.fmt(amount);
+    ctx.font = `800 ${size}px "Trebuchet MS", system-ui, sans-serif`;
+    const w = ctx.measureText(s).width;
+    RH.Sprites.draw(ctx, 'coin', '🪙', x - w / 2 - size * 0.45, y, size * 0.95);
+    text(s, x + size * 0.45, y, size, '#ffe35c');
+  }
 
   const zoneSprite = (z) => (C.stations[z.id] ? 'st_' : 'zone_') + z.id;
 
@@ -637,7 +896,7 @@ RH.Game = (function () {
     ctx.globalAlpha = 0.5;
     RH.Sprites.draw(ctx, zoneSprite(z), z.emoji, z.x, z.y - 18, 48);
     ctx.globalAlpha = 1;
-    text('🪙 ' + RH.fmt(cost - paid), z.x, z.y + 22, 24, '#ffe35c');
+    coinText(cost - paid, z.x, z.y + 22, 24);
     text(RH.t('zone_' + z.id), z.x, z.y + z.h / 2 + 14, 16, '#fff');
     text(RH.t('zoned_' + z.id), z.x, z.y + z.h / 2 + 34, 14, 'rgba(255,255,255,0.7)', 700);
   }
@@ -648,12 +907,12 @@ RH.Game = (function () {
     drawDrainBox(p, paid, cost, 'rgba(255,227,92,0.6)');
     emoji('⬆️', p.x - 26, p.y - 16, 26);
     RH.Sprites.draw(ctx, 'st_' + p.id, p.emoji, p.x + 22, p.y - 16, 38);
-    text('🪙 ' + RH.fmt(cost - paid), p.x, p.y + 22, 20, '#ffe35c');
-    text(RH.t(p.id) + ' · ' + RH.t('lvl') + ' ' + padLv(p.id), p.x, p.y + p.h / 2 + 14, 15, '#fff');
+    coinText(cost - paid, p.x, p.y + 22, 20);
+    const lv = padLv(p.id);
+    text(RH.t('lvl') + ' ' + lv + ' → ' + (lv + 1), p.x, p.y + p.h / 2 + 14, 15, '#fff');
     text(RH.t('padd_' + p.id), p.x, p.y + p.h / 2 + 32, 13, 'rgba(255,255,255,0.7)', 700);
   }
 
-  // hat offsets relative to the raccoon sprite: width share and top shift (in sprite widths)
   // All hat sprites share one frame (120×100, head line at y≈88): width share of the raccoon sprite.
   const HAT_W = 0.46;
 
@@ -679,35 +938,32 @@ RH.Game = (function () {
     if (R) ctx.drawImage(R, -rw / 2, -rh * 0.62, rw, rh);
     else emoji('🦝', 0, 0, size);
     ctx.restore();
-    const H = hatSprite && RH.Sprites.img(hatSprite);
-    if (R && H) {
-      const hw = rw * HAT_W, hh = hw * H.naturalHeight / H.naturalWidth;
-      ctx.drawImage(H, x - hw / 2, top + rh * 54 / 210 - hh * 0.88, hw, hh);
+    const Hs = hatSprite && RH.Sprites.img(hatSprite);
+    if (R && Hs) {
+      const hw = rw * HAT_W, hh = hw * Hs.naturalHeight / Hs.naturalWidth;
+      ctx.drawImage(Hs, x - hw / 2, top + rh * 54 / 210 - hh * 0.88, hw, hh);
     } else if (hat) emoji(hat, x, R ? top + rh * 0.06 : y + by - size * 0.55, size * 0.55);
     const n = stack.length;
     const shown = Math.min(n, 12);
     for (let i = 0; i < shown; i++) {
-      RH.Sprites.draw(ctx, 'bag', '💰', x - face * size * 0.45, y + by - size * 0.15 - i * size * 0.26, size * 0.5);
+      RH.Sprites.draw(ctx, goodsSprite(stack[i]), goodsEmoji(stack[i]), x - face * size * 0.45, y + by - size * 0.15 - i * size * 0.26, size * 0.5);
     }
     if (n > 12) text('×' + n, x - face * size * 0.35, y + by - size * 0.25 - 12 * size * 0.26 - 6, 16, '#fff');
   }
 
-  function drawCrew() {
-    const hired = C.crew.filter((c) => crewLv(c.id) > 0);
-    hired.forEach((c, i) => {
-      const x = C.world.w / 2 - (hired.length - 1) * 45 + i * 90;
-      const y = 460 + Math.sin(time * 2 + i) * 3;
-      drawRaccoon(x, y, 40, i % 2 ? -1 : 1, 0, [], c.emoji, false, 'crew_' + c.id);
-      text(RH.t('lvl') + ' ' + crewLv(c.id), x, y + 32, 13, '#fff');
-    });
-  }
-
-  function drawTutorial() {
+  function tutorialTarget() {
     const step = S.tutorial;
-    if (step >= 5) return;
-    const target = step === 0 ? C.stations.board : step <= 2 ? C.stations.garage : step === 3 ? C.stations.laundry : C.stations.workshop;
-    if (step === 3 && !S.carried.length) return;
-    if (step === 4 && S.coins < Math.min(...C.upgrades.slice(0, 6).map((u) => stats.upgradeCost(u.id)))) return;
+    if (step >= 6) return null;
+    if (step === 0) return ST.board;
+    if (step <= 2) return ST.garage;
+    if (step === 3) return S.carried.length ? stallRect(S.carried[0].k) : ST.garage;
+    if (step === 4) return queue.length ? ST.laundry : null;
+    if (S.coins < Math.min(...C.upgrades.slice(0, 6).map((u) => stats.upgradeCost(u.id)))) return null;
+    return ST.workshop;
+  }
+  function drawTutorial() {
+    const target = tutorialTarget();
+    if (!target) return;
     const y = target.y - target.h / 2 - 40 + Math.sin(time * 6) * 10;
     emoji('👇', target.x, y, 54);
     const dx = target.x - player.x, dy = target.y - player.y;
@@ -726,6 +982,59 @@ RH.Game = (function () {
     }
   }
 
+  function drawStalls() {
+    for (let k = 0; k < 4; k++) {
+      const r = stallRect(k);
+      const h = heists()[k];
+      if (!stallOpen(k)) {
+        ctx.globalAlpha = 0.35;
+        RH.Sprites.draw(ctx, 'st_stall', '🏪', r.x, r.y, r.w);
+        RH.Sprites.draw(ctx, 'h_' + h.id, h.emoji, r.x, r.y - 6, 36);
+        ctx.globalAlpha = 1;
+        text('🔒', r.x, r.y + r.h / 2 + 16, 16, '#fff');
+        continue;
+      }
+      const near = inRect(player.x, player.y, r, 14) && S.carried.some((it) => it.k === k);
+      if (near) {
+        ctx.fillStyle = 'rgba(125,255,178,0.25)';
+        rr(r.x - r.w / 2 - 6, r.y - r.h / 2 - 6, r.w + 12, r.h + 12, 16);
+        ctx.fill();
+      }
+      RH.Sprites.draw(ctx, 'st_stall', '🏪', r.x, r.y, r.w);
+      const n = S.stalls[k].length;
+      for (let i = 0; i < Math.min(n, 8); i++) {
+        const col = i % 4, row = Math.floor(i / 4);
+        RH.Sprites.draw(ctx, 'h_' + h.id, h.emoji, r.x - 42 + col * 28, r.y + 4 - row * 18, 30);
+      }
+      if (!n) RH.Sprites.draw(ctx, 'h_' + h.id, h.emoji, r.x, r.y - 2, 30);
+      text(n + '/' + C.shop.stallCap, r.x, r.y + r.h / 2 + 14, 15, n ? '#fff' : '#ff9aa8');
+    }
+  }
+
+  function drawBuyer(b) {
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.beginPath();
+    ctx.ellipse(b.x, b.y + 22, 18, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    const by = Math.abs(Math.sin(b.bob)) * -4;
+    ctx.save();
+    ctx.translate(b.x, b.y + by);
+    ctx.scale(b.face, 1);
+    RH.Sprites.draw(ctx, C.shop.buyers[b.kind], C.shop.buyerEmoji[b.kind], 0, -6, 60);
+    ctx.restore();
+    b.items.slice(0, 3).forEach((it, i) => RH.Sprites.draw(ctx, goodsSprite(it), goodsEmoji(it), b.x - 14 + i * 14, b.y - 46 + by, 24));
+  }
+
+  function drawDoor() {
+    const [, y] = C.shop.door;
+    ctx.fillStyle = districtCfg().tiles[0];
+    ctx.fillRect(C.world.w - 12, y - 60, 24, 120);
+    ctx.fillStyle = '#ffd84d';
+    ctx.fillRect(C.world.w - 4, y - 60, 8, 8);
+    ctx.fillRect(C.world.w - 4, y + 52, 8, 8);
+    text('➜', C.world.w + 34, y, 30, '#ffd84d');
+  }
+
   const hatEmoji = () => (C.cosmetics.hats.find((h) => h.id === S.cosmetics.hat) || C.cosmetics.hats[0]).emoji;
   const vanEmoji = () => (C.cosmetics.vans.find((h) => h.id === S.cosmetics.van) || C.cosmetics.vans[0]).emoji;
 
@@ -741,10 +1050,16 @@ RH.Game = (function () {
     drawFloor();
     C.buyZones.forEach(drawZone);
     C.levelPads.forEach(drawPad);
-    for (const id in C.stations) if (stationOn(id)) drawStation(id, C.stations[id]);
-    drawCrew();
-    helpers.forEach((hp) => drawRaccoon(hp.x, hp.y, 40, hp.face || 1, hp.bob, hp.carry, '🧢', false, 'hat_cap'));
-    drawRaccoon(player.x, player.y, 56, player.face, player.bob, S.carried, hatEmoji(), true, 'hat_' + S.cosmetics.hat);
+    for (const id in ST) if (stationOn(id)) drawStation(id, ST[id]);
+    drawStalls();
+    // characters sorted by y so the lower one is drawn in front
+    const actors = [];
+    buyers.forEach((b) => actors.push({ y: b.y, draw: () => drawBuyer(b) }));
+    if (lvl('cashier') > 0) actors.push({ y: REG.y - 40, draw: () => drawRaccoon(REG.x + 60, REG.y - 40, 40, -1, 0, [], '💵', false, 'hat_cap') });
+    crewBots.forEach((b) => actors.push({ y: b.y, draw: () => drawRaccoon(b.x, b.y, 42, b.face || 1, b.bob, b.carry, b.emoji, false, 'crew_' + b.id) }));
+    helpers.forEach((hp) => actors.push({ y: hp.y, draw: () => drawRaccoon(hp.x, hp.y, 40, hp.face || 1, hp.bob, hp.carry, '🧢', false, 'hat_cap') }));
+    actors.push({ y: player.y, draw: () => drawRaccoon(player.x, player.y, 56, player.face, player.bob, S.carried, hatEmoji(), true, 'hat_' + S.cosmetics.hat) });
+    actors.sort((a, b) => a.y - b.y).forEach((a) => a.draw());
     if (S.carried.length >= stats.carryCap()) text('MAX', player.x, player.y + 44, 16, '#ff6fb5');
     drawTutorial();
     floaters.forEach((f) => {
@@ -774,7 +1089,7 @@ RH.Game = (function () {
     canvas.height = Math.round(H * dpr);
     canvas.style.width = W + 'px';
     canvas.style.height = H + 'px';
-    cam.scale = Math.max(Math.min(W, H) / 760, H / 1120, W / 1520);
+    cam.scale = Math.max(Math.min(W, H) / 780, H / (C.world.h + 120), W / (C.world.w + 120));
   }
 
   return {
@@ -790,6 +1105,7 @@ RH.Game = (function () {
     districtCfg,
     zoneBought,
     vanEmoji,
+    queueLength: () => queue.length,
     init(c) {
       canvas = c;
       ctx = canvas.getContext('2d');
@@ -797,6 +1113,7 @@ RH.Game = (function () {
       if (S.lang) RH.lang = S.lang;
       player.x = S.player.x; player.y = S.player.y;
       syncHelpers();
+      syncCrew();
       resize();
       window.addEventListener('resize', resize);
       cam.x = player.x - W / cam.scale / 2;
@@ -812,6 +1129,7 @@ RH.Game = (function () {
       S = RH.Save.newState();
       S.lang = RH.lang;
       helpers = [];
+      crewBots = [];
       heistCache.d = 0;
       player.x = S.player.x; player.y = S.player.y;
       RH.Save.save(S);

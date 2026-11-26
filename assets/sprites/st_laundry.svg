@@ -1,10 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><g stroke="#2a2230" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
-<rect x="18" y="10" width="84" height="92" rx="10" fill="#ffa94d"/>
-<rect x="28" y="20" width="64" height="30" rx="5" fill="#2f2b3a" stroke-width="4"/>
-<path d="M36 36 L48 36 M44 30 L50 36 L44 42" stroke="#7dffb2" stroke-width="4" fill="none"/>
-<circle cx="70" cy="35" r="8" fill="#ffd84d" stroke-width="3"/>
-<rect x="44" y="58" width="32" height="7" rx="3" fill="#2a2230" stroke="none"/>
-<path d="M28 76 L92 76 L88 98 L32 98Z" fill="#e0812a" stroke-width="4"/>
-<circle cx="50" cy="88" r="7" fill="#ffd84d" stroke-width="3"/><circle cx="66" cy="90" r="7" fill="#ffd84d" stroke-width="3"/><circle cx="58" cy="82" r="7" fill="#ffd84d" stroke-width="3"/>
-<rect x="22" y="102" width="14" height="10" rx="2" fill="#b0601a" stroke-width="4"/><rect x="84" y="102" width="14" height="10" rx="2" fill="#b0601a" stroke-width="4"/>
+<rect x="10" y="62" width="100" height="48" rx="8" fill="#ffa94d"/>
+<rect x="18" y="72" width="84" height="12" rx="3" fill="#e0812a" stroke-width="4"/>
+<path d="M24 62 L32 34 L88 34 L96 62Z" fill="#5b6478"/>
+<rect x="38" y="40" width="44" height="16" rx="3" fill="#2f2b3a" stroke-width="4"/>
+<text x="60" y="53" font-size="13" font-weight="900" text-anchor="middle" fill="#7dffb2" stroke="none" font-family="Courier New, monospace">$$$</text>
+<g stroke-width="3" fill="#fff"><rect x="30" y="90" width="12" height="9" rx="2"/><rect x="48" y="90" width="12" height="9" rx="2"/><rect x="66" y="90" width="12" height="9" rx="2"/><rect x="84" y="90" width="10" height="9" rx="2" fill="#7dffb2"/></g>
+<path d="M60 34 L60 20" stroke-width="5"/>
+<rect x="44" y="6" width="32" height="16" rx="4" fill="#ffd84d" stroke-width="4"/>
+<text x="60" y="19" font-size="12" font-weight="900" text-anchor="middle" fill="#2a2230" stroke="none" font-family="Arial">$</text>
 </g></svg>
