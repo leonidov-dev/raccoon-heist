@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>Raccoon Heist Tycoon</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script>window.RH_RELEASE = true;</script>
+  <script src="https://game-cdn.poki.com/scripts/v2/poki-sdk.js"></script>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="hud">
+    <div id="hud-left">
+      <div id="money"><span class="coin">🪙</span><span id="coins">0</span><span id="income"></span></div>
+      <div id="heat"><span id="heat-label">🚨</span><div class="bar"><div id="heat-fill"></div></div><span id="heat-pct">0%</span><span class="help">?</span></div>
+    </div>
+    <canvas id="minimap" width="260" height="76"></canvas>
+    <div id="hud-buttons">
+      <button class="hbtn" id="btn-album">📖<span class="hlabel"></span></button>
+      <button class="hbtn" id="btn-wardrobe">👒<span class="hlabel"></span></button>
+      <button class="hbtn" id="btn-chest">🎁<span class="sub"></span><span class="hlabel"></span></button>
+      <button class="hbtn" id="btn-boost">⚡<span class="sub"></span><span class="hlabel"></span></button>
+      <button class="hbtn small" id="btn-sound">🔊</button>
+      <button class="hbtn small" id="btn-lang">EN</button>
+    </div>
+    <div id="tut-hint"></div>
+  </div>
+
+  <div id="panel">
+    <div id="panel-head"><span id="panel-title"></span><button id="panel-close">✕</button></div>
+    <div id="panel-body"></div>
+  </div>
+
+  <div id="toasts"></div>
+  <div id="modal"></div>
+  <div id="loading">🦝</div>
+
+  <script src="js/config.js"></script>
+  <script src="js/strings.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/poki.js"></script>
+  <script src="js/save.js"></script>
+  <script src="js/input.js"></script>
+  <script src="js/sprites.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/chase.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

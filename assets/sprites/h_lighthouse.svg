@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><clipPath id="lc"><path d="M34 94 L40 34 L60 34 L66 94Z"/></clipPath></defs><g stroke="#2a2230" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
+<path d="M50 20 L6 6 L6 34Z M50 20 L94 6 L94 34Z" fill="#fff3a0" stroke="none" opacity=".8"/>
+<path d="M34 94 L40 34 L60 34 L66 94Z" fill="#fff"/>
+<g clip-path="url(#lc)" stroke="none" fill="#ff4d4d"><rect x="0" y="44" width="100" height="12"/><rect x="0" y="68" width="100" height="12"/></g>
+<path d="M34 94 L40 34 L60 34 L66 94Z" fill="none"/>
+<rect x="38" y="16" width="24" height="18" rx="3" fill="#ffd84d"/>
+<path d="M34 16 L50 4 L66 16Z" fill="#ff4d4d"/>
+<rect x="24" y="92" width="52" height="6" rx="2" fill="#8d97a8"/>
+</g></svg>

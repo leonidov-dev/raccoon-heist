@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><g stroke="#2a2230" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
+<path fill-rule="evenodd" d="M50 10 a40 38 0 1 0 0.01 0Z M50 40 a12 10 0 1 1 -0.01 0Z" fill="#d9a060"/>
+<path fill-rule="evenodd" d="M50 16 Q62 14 70 22 Q82 26 84 38 Q90 50 82 60 Q80 72 66 74 Q56 82 46 76 Q32 78 26 68 Q16 58 20 46 Q20 30 34 26 Q40 16 50 16Z M50 38 a14 12 0 1 1 -0.01 0Z" fill="#ff8fb5" stroke-width="4"/>
+<g stroke-width="2.5"><rect x="30" y="44" width="10" height="4" rx="2" fill="#fff" transform="rotate(30 35 46)"/><rect x="62" y="30" width="10" height="4" rx="2" fill="#ffd84d" transform="rotate(-20 67 32)"/><rect x="64" y="56" width="10" height="4" rx="2" fill="#3fd8d0" transform="rotate(50 69 58)"/><rect x="44" y="64" width="10" height="4" rx="2" fill="#a77bff"/></g>
+</g></svg>

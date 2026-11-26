@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><defs><clipPath id="gc"><path d="M60 50 Q84 46 84 66 Q84 74 78 78 Q96 86 92 100 Q88 116 60 116 Q32 116 28 100 Q24 86 42 78 Q36 74 36 66 Q36 46 60 50Z"/></clipPath></defs><g stroke="#2a2230" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
+<rect x="54" y="10" width="12" height="56" fill="#8a6440"/>
+<rect x="49" y="2" width="22" height="16" rx="4" fill="#5a4030"/>
+<path d="M60 50 Q84 46 84 66 Q84 74 78 78 Q96 86 92 100 Q88 116 60 116 Q32 116 28 100 Q24 86 42 78 Q36 74 36 66 Q36 46 60 50Z" fill="#ff6fb5"/>
+<g clip-path="url(#gc)" stroke="none">
+<rect x="0" y="62" width="120" height="9" fill="#ff8a3a"/><rect x="0" y="71" width="120" height="9" fill="#ffd84d"/>
+<rect x="0" y="80" width="120" height="9" fill="#5fbf5a"/><rect x="0" y="89" width="120" height="9" fill="#4da3ff"/>
+<rect x="0" y="98" width="120" height="20" fill="#a77bff"/>
+</g>
+<path d="M60 50 Q84 46 84 66 Q84 74 78 78 Q96 86 92 100 Q88 116 60 116 Q32 116 28 100 Q24 86 42 78 Q36 74 36 66 Q36 46 60 50Z" fill="none"/>
+<circle cx="60" cy="86" r="9" fill="#2a2230" stroke="none"/>
+<rect x="48" y="100" width="24" height="6" rx="2" fill="#5a4030" stroke-width="3"/>
+<path d="M57 14 L57 100 M63 14 L63 100" stroke="#fff" stroke-width="1.5" stroke-opacity=".8"/>
+</g></svg>

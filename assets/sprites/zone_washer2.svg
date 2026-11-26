@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><g stroke="#2a2230" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
+<rect x="14" y="16" width="92" height="92" rx="10" fill="#b8c4d6"/>
+<rect x="24" y="26" width="72" height="24" rx="4" fill="#2f2b3a" stroke-width="4"/>
+<text x="60" y="45" font-size="18" font-weight="900" text-anchor="middle" fill="#7dffb2" stroke="none" font-family="Courier New, monospace">1250</text>
+<g stroke-width="4"><rect x="26" y="60" width="16" height="12" rx="3" fill="#fff"/><rect x="52" y="60" width="16" height="12" rx="3" fill="#fff"/><rect x="78" y="60" width="16" height="12" rx="3" fill="#ffd84d"/>
+<rect x="26" y="80" width="16" height="12" rx="3" fill="#fff"/><rect x="52" y="80" width="16" height="12" rx="3" fill="#fff"/><rect x="78" y="80" width="16" height="12" rx="3" fill="#ff6fb5"/></g>
+<ellipse cx="96" cy="14" rx="12" ry="5" fill="#ffd84d" stroke-width="4"/><ellipse cx="96" cy="8" rx="12" ry="5" fill="#ffd84d" stroke-width="4"/>
+</g></svg>

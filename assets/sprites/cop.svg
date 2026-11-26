@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 212">
+  <g stroke="#2a2230" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
+    <ellipse cx="76" cy="198" rx="18" ry="10" fill="#1f2433"/>
+    <ellipse cx="124" cy="198" rx="18" ry="10" fill="#1f2433"/>
+    <ellipse cx="100" cy="166" rx="48" ry="36" fill="#3b5b9a"/>
+    <path d="M56 170 Q100 182 144 170 L144 180 Q100 192 56 180 Z" fill="#1f2433" stroke-width="4"/>
+    <path d="M118 146 l4 8 9 1 -7 6 2 9 -8 -5 -8 5 2 -9 -7 -6 9 -1 Z" fill="#ffd84d" stroke-width="3"/>
+    <ellipse cx="56" cy="166" rx="12" ry="18" transform="rotate(26 56 166)" fill="#3b5b9a"/>
+    <ellipse cx="144" cy="166" rx="12" ry="18" transform="rotate(-26 144 166)" fill="#3b5b9a"/>
+    <circle cx="50" cy="180" r="9" fill="#c89a6a" stroke-width="4"/>
+    <circle cx="150" cy="180" r="9" fill="#c89a6a" stroke-width="4"/>
+    <!-- floppy ears -->
+    <ellipse cx="34" cy="92" rx="16" ry="26" transform="rotate(-28 34 92)" fill="#8a6440"/>
+    <ellipse cx="166" cy="92" rx="16" ry="26" transform="rotate(28 166 92)" fill="#8a6440"/>
+    <!-- jowly head -->
+    <ellipse cx="66" cy="128" rx="32" ry="22" fill="#c89a6a"/>
+    <ellipse cx="134" cy="128" rx="32" ry="22" fill="#c89a6a"/>
+    <ellipse cx="100" cy="98" rx="70" ry="52" fill="#c89a6a"/>
+    <ellipse cx="66" cy="128" rx="29" ry="19" fill="#c89a6a" stroke="none"/>
+    <ellipse cx="134" cy="128" rx="29" ry="19" fill="#c89a6a" stroke="none"/>
+    <ellipse cx="100" cy="124" rx="40" ry="22" fill="#ecd5ad" stroke="none"/>
+    <path d="M58 80 Q72 72 82 78" fill="none" stroke="#a37850" stroke-width="5"/>
+    <!-- grumpy eyes -->
+    <ellipse cx="74" cy="96" rx="12" ry="11" fill="#fff" stroke-width="4"/>
+    <ellipse cx="126" cy="96" rx="12" ry="11" fill="#fff" stroke-width="4"/>
+    <circle cx="76" cy="99" r="6" fill="#2a2230" stroke="none"/>
+    <circle cx="124" cy="99" r="6" fill="#2a2230" stroke="none"/>
+    <path d="M58 82 L90 92" stroke-width="7"/>
+    <path d="M142 82 L110 92" stroke-width="7"/>
+    <!-- nose + underbite -->
+    <ellipse cx="100" cy="110" rx="17" ry="10" fill="#2a2230" stroke="none"/>
+    <ellipse cx="94" cy="107" rx="5" ry="3" fill="#6b6176" stroke="none"/>
+    <path d="M74 138 Q100 128 126 138 Q100 150 74 138 Z" fill="#7a3a46" stroke-width="5"/>
+    <path d="M84 136 l4 -9 4 8 Z M108 135 l4 -8 4 9 Z" fill="#fff" stroke-width="3"/>
+    <!-- police cap -->
+    <path d="M42 62 Q46 22 100 20 Q154 22 158 62 Z" fill="#2d4475"/>
+    <path d="M42 56 Q100 64 158 56 L158 70 Q100 78 42 70 Z" fill="#1f3058"/>
+    <path d="M54 70 Q100 86 146 70 L142 80 Q100 96 58 80 Z" fill="#1b1b28"/>
+    <circle cx="100" cy="42" r="9" fill="#ffd84d" stroke-width="4"/>
+    <path d="M62 34 Q76 26 92 26" fill="none" stroke="#4a66a0" stroke-width="5"/>
+  </g>
+</svg>
