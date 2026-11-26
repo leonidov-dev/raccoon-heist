@@ -2,6 +2,7 @@
 // Dev (index.html as is): mock SDK with fake ad overlays, logs to console.
 // Release (built by tools/build.py): window.RH_RELEASE = true and the real Poki SDK script is loaded.
 // If the real SDK is blocked (adblock), ads silently do nothing and rewarded ads give no reward.
+// Preview (tools/build.py --preview, for sharing outside Poki): no SDK, no ads, rewards are granted right away.
 window.RH = window.RH || {};
 
 (function () {
@@ -42,7 +43,9 @@ window.RH = window.RH || {};
     rewardedBreak: () => Promise.resolve(false),
   };
 
-  const sdk = USE_REAL_SDK ? (window.PokiSDK || noop) : mock;
+  const free = Object.assign({}, noop, { rewardedBreak: () => Promise.resolve(true) });
+
+  const sdk = window.RH_PREVIEW === true ? free : USE_REAL_SDK ? (window.PokiSDK || noop) : mock;
 
   let playing = false;
   let inAd = false;
